@@ -1,12 +1,13 @@
 from PyQt5.QtGui import QDrag, QCursor
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QSizePolicy, QToolButton, QSplitter
 from Elements.MHeaderBar import MHeaderBar
-class MSplitWindow(QFrame):
+class MSplitter(QFrame):
 
 
     def __init__(self, parent = None):
         super().__init__(parent)
         self.setObjectName("main_frame")
+
         # Construct top-level window elements
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
@@ -16,9 +17,9 @@ class MSplitWindow(QFrame):
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
 
-        self.header_frame = MHeaderBar(self)
+        #self.header_frame = MHeaderBar(self)
 
-        self.main_layout.addWidget(self.header_frame)
+        #self.main_layout.addWidget(self.header_frame)
         self.main_layout.addWidget(self.main_splitter)
         self.show()
 
@@ -28,4 +29,9 @@ class MSplitWindow(QFrame):
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
     def add_content(self, content):
         self.main_splitter.addWidget(content)
+
+    def get_num_widgets(self):
+        return self.main_splitter.count()
+
+
 
