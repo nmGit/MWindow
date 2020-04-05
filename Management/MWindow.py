@@ -16,6 +16,7 @@ class MWindow(QFrame):
         self.header_frame = MHeaderBar(self)
 
         self.main_layout.addWidget(self.header_frame)
+        self.main_layout.addStretch(0)
         self.main_layout.addWidget(self.widget)
 
         self.show()
@@ -41,10 +42,11 @@ class MWindow(QFrame):
         self.drop_region_right_frame.setStyleSheet(self.drop_region_stylesheet)
         self.drop_region_bottom_frame.setStyleSheet(self.drop_region_stylesheet)
 
-        self.drop_regions = [self.drop_region_top_frame,
-                             self.drop_region_left_frame,
-                             self.drop_region_right_frame,
-                             self.drop_region_bottom_frame]
+        self.drop_regions = {"top" : self.drop_region_top_frame,
+                             "left" : self.drop_region_left_frame,
+                             "right" : self.drop_region_right_frame,
+                             "bottom" : self.drop_region_bottom_frame}
+
     def get_content(self):
         return self.widget
 
@@ -126,13 +128,15 @@ class MWindow(QFrame):
 
     def focus_drop_region(self, pos):
         active_region = self.over_drop_regions(pos)
-        for drop_region in self.drop_regions:
+        for drop_region in self.drop_regions.values():
             if drop_region is active_region:
                 drop_region.setStyleSheet(self.drop_region_focused_stylesheet)
             else:
                 drop_region.setStyleSheet(self.drop_region_stylesheet)
 
 
+    def get_drop_region(self, key):
+        return self.drop_regions[key]
 
     def _remove_child_window(self, child_window):
         self.child_windows.remove(child_window)

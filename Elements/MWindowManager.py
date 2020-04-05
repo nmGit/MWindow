@@ -32,34 +32,60 @@ class MWindowManager(QtWidgets.QFrame):
 
         children_windows = old_parent.get_child_windows()
 
-        if(len(children_windows) == 1):
-            self.decouple(children_windows[0])
+        #if(len(children_windows) == 1):
+         #   self.decouple(children_windows[0])
         #old_parent.setParent(None)
         old_parent.setStyleSheet("background-color:purple")
         old_parent.deleteLater()
 
         win.show()
 
-    def join_windows_in_splitter(self, win1, win2):
-        if type(win1) is MSplitter:
-            print("Win1 children:", win1.findChildren())
+    def join_windows_in_splitter(self, win1, win2, location):
+        # If the destination window already contains a splitter
+        if type(win1.get_content()) is MSplitter:
+            # Take out the existing splitter and its contents
+            existing_splitter = win1.get_content()
+            new_splitter = MSplitter()
 
-            if(win2 not in win1.findChildren()):
-                win1.add_content(win2)
-                win2.set_parent_window(win1.get_parent_window())
+            # Add the existing splitter to the new splitter as a child
+            new_splitter.add_content(existing_splitter)
 
-        elif type(win2) is MSplitter:
-            print("Win2 children:", win2.findChildren())
-            if(win1 not in win2.findChildren()):
-                win2.add_content(win1)
-                win1.set_parent_window(win2.get_parent_window())
+            # Add the new widget to the new splitter at the specified location
+            new_splitter.add_content(win2, location)
+
+            # Create a new window with the new splitter
+            self.add_window(new_splitter)
+
+            # Delete win2 and win1. Their contents has been removed and combined in a new window
+            win1.deleteLater()
+
+        elif type(win2.get_content()) is MSplitter:
+            # Take out the existing splitter and its contents
+            existing_splitter = win2.get_content()
+            new_splitter = MSplitter()
+
+
+
+            # Add the existing splitter to the new splitter as a child
+            new_splitter.add_content(existing_splitter)
+
+            # Add the new widget to the new splitter at the specified location
+            new_splitter.add_content(win1, location)
+
+            # Create a new window with the new splitter
+            self.add_window(new_splitter)
+
+            # Delete win2 and win1. Their contents has been removed and combined in a new window
+            win2.deleteLater()
+
         else:
             new_splitter = MSplitter(self)
 
-            new_splitter.add_content(win1)
             new_splitter.add_content(win2)
+            new_splitter.add_content(win1, location)
 
             new_win = self.add_window(new_splitter)
+
             win1.set_parent_window(new_win)
             win2.set_parent_window(new_win)
 
@@ -98,9 +124,19 @@ class MWindowManager(QtWidgets.QFrame):
         for child in self.children():
             if self.window is not child:
                 if child.geometry().contains(event.pos()):
+                    drop_region = child.over_drop_regions(event.globalPos())
+                    if drop_region is child.get_drop_region("top"):
+                        self.join_windows_in_splitter(self.window, child, "top")
+                    if drop_region is child.get_drop_region("left"):
+                        self.join_windows_in_splitter(self.window, child, "left")
+                    if drop_region is child.get_drop_region("right"):
+                        self.join_windows_in_splitter(self.window, child, "right")
+                    if drop_region is child.get_drop_region("bottom"):
+                        self.join_windows_in_splitter(self.window, child, "bottom")
                     print("You dropped a child on another child!")
-                    self.join_windows_in_splitter(self.window, child)
+
                     break
+            self._defocus_all_drop_regions()
         event.accept()
 
     def mouseMoveEvent(self, event):
@@ -108,7 +144,7 @@ class MWindowManager(QtWidgets.QFrame):
             self.window.move(event.pos() - self.move_offset)
 
             for child in self.children():
-                if self.window is not child:
+                if self.window is not child and type(child) is MWindow:
                     if child.geometry().contains(event.pos()):
                         child.show_drop_regions()
                         child.focus_drop_region(event.globalPos())
@@ -123,3 +159,8 @@ class MWindowManager(QtWidgets.QFrame):
 
     def _add_child_window(self, child_window):
         self.child_windows.append(child_window)
+
+    def _defocus_all_drop_regions(self):
+        for child in self.children():
+            if self.window is not child and type(child) is MWindow:
+                child.hide_drop_regions()
