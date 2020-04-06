@@ -3,9 +3,10 @@ from Elements.MHeaderBar import MHeaderBar
 
 class MWindow(QFrame):
 
-    def __init__(self, widget):
+    def __init__(self, widget, title):
         super().__init__()
         self.widget = widget
+        self.widget.setMouseTracking(True)
         self.setObjectName("main_frame")
         # Construct top-level window elements
 
@@ -14,6 +15,7 @@ class MWindow(QFrame):
         self.setLayout(self.main_layout)
 
         self.header_frame = MHeaderBar(self)
+        self.header_frame.setTitle(title)
 
         self.main_layout.addWidget(self.header_frame)
         self.main_layout.addStretch(0)
@@ -42,31 +44,27 @@ class MWindow(QFrame):
         self.drop_region_right_frame.setStyleSheet(self.drop_region_stylesheet)
         self.drop_region_bottom_frame.setStyleSheet(self.drop_region_stylesheet)
 
-        self.drop_regions = {"top" : self.drop_region_top_frame,
-                             "left" : self.drop_region_left_frame,
-                             "right" : self.drop_region_right_frame,
-                             "bottom" : self.drop_region_bottom_frame}
-
+        self.drop_regions = {"top": self.drop_region_top_frame,
+                             "left": self.drop_region_left_frame,
+                             "right": self.drop_region_right_frame,
+                             "bottom": self.drop_region_bottom_frame}
+        self.setMinimumHeight(24)
+        self.setMinimumWidth(128)
+        self.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
     def get_content(self):
         return self.widget
+
+    def set_title(self, title):
+        self.header_frame.setTitle(title)
+
+    def get_title(self):
+        return self.header_frame.getTitle()
 
     def get_parent_window(self):
         return self.parent_window
 
     def get_child_windows(self):
         return self.child_windows
-
-    def set_parent_window(self, new_parent_window):
-        # Remove self from old parent
-        if self.parent_window is not None:
-            self.parent_window._remove_child_window(self)
-
-        # Add self to new parent
-        if(new_parent_window is not None):
-            new_parent_window._add_child_window(self)
-
-        # Set local reference to parent
-        self.parent_window = new_parent_window
 
     def show_drop_regions(self):
         window_geometry = self.geometry()
@@ -134,9 +132,23 @@ class MWindow(QFrame):
             else:
                 drop_region.setStyleSheet(self.drop_region_stylesheet)
 
-
     def get_drop_region(self, key):
         return self.drop_regions[key]
+
+    def set_parent_window(self, new_parent_window):
+        # Remove self from old parent
+        if self.parent_window is not None:
+            self.parent_window._remove_child_window(self)
+
+        # Add self to new parent
+        if(new_parent_window is not None):
+            new_parent_window._add_child_window(self)
+
+        # Set local reference to parent
+        self.parent_window = new_parent_window
+
+    def get_child_windows(self):
+        return self.child_windows
 
     def _remove_child_window(self, child_window):
         self.child_windows.remove(child_window)

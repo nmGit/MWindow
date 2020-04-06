@@ -25,8 +25,7 @@ class MSplitter(QFrame):
         self.main_layout.addWidget(self.main_splitter)
         self.show()
 
-        self.setStyleSheet(self.styleSheet() + "QFrame#main_frame{border: 2px solid green}\r\n"
-                                               "QFrame#main_frame{background-color:rgb(200,200,200)}\r\n"
+        self.setStyleSheet(self.styleSheet() + "QFrame#main_frame{background-color:rgb(200,200,200)}\r\n"
                                                "QSplitter::handle#main_splitter"
                                                "{"
                                                "    border: 2px solid rgb(50,50,50);"

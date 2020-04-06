@@ -1,11 +1,17 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QPoint
+from PyQt5.QtCore import Qt
+
 from Management.MWindow import MWindow
 from Elements.MSplitter import MSplitter
 from Elements.MHeaderBar import MHeaderBar
 
 
 class MWindowManager(QtWidgets.QFrame):
+
+    resize_regions = {"none": 0, "top": 1, "bottom": 2, "left": 3, "right": 4, "top-left": 5, "top-right": 6,
+                      "bottom-left": 7, "bottom-right": 8}
+
     def __init__(self):
         super().__init__()
         self.setObjectName("win_manage")
@@ -14,37 +20,69 @@ class MWindowManager(QtWidgets.QFrame):
         self.child_windows = []
         self.move_offset = QPoint(0,0)
         self.window = None
+        self.setMouseTracking(True)
+        self.resize_dimension = self.resize_regions["none"]
 
-    def add_window(self, widget):
-        win = MWindow(widget)
+    def add_window(self, widget, title):
+        win = MWindow(widget, title)
         win.setParent(self)
         win.set_parent_window(self)
+        win.setMouseTracking(True)
         win.show()
-        return win
+        win.move(0, 0)
 
-    def decouple(self, win):
+        return win
+    
+    def get_title(self):
+        return "Main window"
+
+    def decouple(self, win, width = None, height = None):
         orig_position = win.mapToGlobal(win.pos())
+
 
         old_parent = win.get_parent_window()
         win.setParent(self)
         win.set_parent_window(self)
-        win.move(orig_position)
 
+        # Take the global position from the window and map it to coordinates of the main window
+        # Then move the window to that position
+        orig_position_mapped_to_main_window = self.mapFromGlobal(orig_position)
+
+        if(width is not None and height is not None):
+            win.setGeometry(orig_position_mapped_to_main_window.x(),
+                            orig_position_mapped_to_main_window.y(),
+                            width,
+                            height)
+        else:
+            win.move(orig_position_mapped_to_main_window)
+
+        win.updateGeometry()
         children_windows = old_parent.get_child_windows()
 
-        #if(len(children_windows) == 1):
-         #   self.decouple(children_windows[0])
+        if(len(children_windows) == 1):
+            orig_width = children_windows[0].width()
+            orig_height = children_windows[0].height()
+            self.decouple(children_windows[0], orig_width, orig_height)
+            print("Deleting", old_parent.get_title())
+            old_parent.deleteLater()
+
         #old_parent.setParent(None)
+        print("deleting", old_parent)
         old_parent.setStyleSheet("background-color:purple")
-        old_parent.deleteLater()
+
+        #old_parent.deleteLater()
 
         win.show()
+        return win
 
     def join_windows_in_splitter(self, win1, win2, location):
         # If the destination window already contains a splitter
         if type(win1.get_content()) is MSplitter:
+            print("You dropped a window on a splitter")
             # Take out the existing splitter and its contents
             existing_splitter = win1.get_content()
+            existing_windows = win1.get_child_windows()
+
             new_splitter = MSplitter()
 
             # Add the existing splitter to the new splitter as a child
@@ -54,17 +92,24 @@ class MWindowManager(QtWidgets.QFrame):
             new_splitter.add_content(win2, location)
 
             # Create a new window with the new splitter
-            self.add_window(new_splitter)
+            new_window = self.add_window(new_splitter, "%s, %s" % (win1.get_title(), win2.get_title()))
+
+            # Now we need to re-parent all existing windows as well as the one that was dragged in
+            for window in existing_windows:
+                window.set_parent_window(new_window)
+            win2.set_parent_window(new_window)
 
             # Delete win2 and win1. Their contents has been removed and combined in a new window
+            print("Deleting", win1.get_title())
             win1.deleteLater()
 
         elif type(win2.get_content()) is MSplitter:
+            print("You dropped a splitter on a window")
             # Take out the existing splitter and its contents
             existing_splitter = win2.get_content()
+            existing_windows = win2.get_child_windows()
+
             new_splitter = MSplitter()
-
-
 
             # Add the existing splitter to the new splitter as a child
             new_splitter.add_content(existing_splitter)
@@ -73,9 +118,15 @@ class MWindowManager(QtWidgets.QFrame):
             new_splitter.add_content(win1, location)
 
             # Create a new window with the new splitter
-            self.add_window(new_splitter)
+            new_window = self.add_window(new_splitter, "%s, %s" % (win1.get_title(), win2.get_title()))
+
+            # Now we need to re-parent all existing windows as well as the one that was dragged in
+            for window in existing_windows:
+                window.set_parent_window(new_window)
+            win1.set_parent_window(new_window)
 
             # Delete win2 and win1. Their contents has been removed and combined in a new window
+            print("Deleting", win2.get_title())
             win2.deleteLater()
 
         else:
@@ -84,33 +135,163 @@ class MWindowManager(QtWidgets.QFrame):
             new_splitter.add_content(win2)
             new_splitter.add_content(win1, location)
 
-            new_win = self.add_window(new_splitter)
+            new_win = self.add_window(new_splitter, "%s, %s" % (win1.get_title(), win2.get_title()))
 
             win1.set_parent_window(new_win)
             win2.set_parent_window(new_win)
+
+
+
+    def mouse_is_over_resize_region(self, pos):
+        child = self.childAt(self.mapFromGlobal(pos))
+        # print(child)
+        if child is None:
+            return self.resize_regions["none"]
+
+        if type(child) is MHeaderBar:
+            child = child.getWindow()
+        if type(child) is MWindow:
+
+            x = child.mapFromGlobal(pos).x()
+            y = child.mapFromGlobal(pos).y()
+            width = child.width()
+            height = child.height()
+            margin = 8
+
+            if y < margin and x < margin:
+                return self.resize_regions["top-left"]
+            elif y > height - margin and x > width - margin:
+                return self.resize_regions["bottom-right"]
+            elif y > height - margin and x < margin:
+                return self.resize_regions["bottom-left"]
+            elif y < margin and x > width - margin:
+                return self.resize_regions["top-right"]
+            elif x < margin:
+                return self.resize_regions["left"]
+            elif x > width - margin:
+                return self.resize_regions["right"]
+            elif y < margin:
+                return self.resize_regions["top"]
+            elif y > height - margin:
+                return self.resize_regions["bottom"]
+            else:
+                return self.resize_regions["none"]
+
+    def update_cursor_shape(self, pos):
+        '''
+        Takes a global coordinate and makes the cursor the correct shape
+        '''
+        self.setCursor(Qt.ArrowCursor)
+        child = self.childAt(self.mapFromGlobal(pos))
+        #print(child)
+        if child is None:
+            self.setCursor(Qt.ArrowCursor)
+
+            return
+        region = self.mouse_is_over_resize_region(pos)
+
+        if region is self.resize_regions["top-left"]:
+            self.setCursor(Qt.SizeFDiagCursor)
+        elif region is self.resize_regions["bottom-right"]:
+            self.setCursor(Qt.SizeFDiagCursor)
+        elif region is self.resize_regions["bottom-left"]:
+            self.setCursor(Qt.SizeBDiagCursor)
+        elif region is self.resize_regions["top-right"]:
+            self.setCursor(Qt.SizeBDiagCursor)
+
+
+        elif region is self.resize_regions["left"]:
+            self.setCursor(Qt.SizeHorCursor)
+        elif region is self.resize_regions["right"]:
+            self.setCursor(Qt.SizeHorCursor)
+
+
+        elif region is self.resize_regions["top"]:
+            self.setCursor(Qt.SizeVerCursor)
+        elif region is self.resize_regions["bottom"]:
+            self.setCursor(Qt.SizeVerCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+
+    def move_window_dimension_to(self, window, dimension, pos):
+        old_geometry = window.geometry()
+        pos_mapped_to_main = self.mapFromGlobal(pos)
+
+        if dimension is self.resize_regions["top-left"]:
+            window.setGeometry(old_geometry.x() + self.mapFromGlobal(pos).x() - old_geometry.x(),
+                               old_geometry.y() + self.mapFromGlobal(pos).y() - old_geometry.y(),
+                               old_geometry.width() - (self.mapFromGlobal(pos).x() - old_geometry.x()),
+                               old_geometry.height() - (self.mapFromGlobal(pos).y() - old_geometry.y())
+                               )
+            window.updateGeometry()
+
+        elif dimension is self.resize_regions["bottom-right"]:
+            window.setGeometry(old_geometry.x(),
+                               old_geometry.y(),
+                               self.mapFromGlobal(pos).x() - old_geometry.x(),
+                               self.mapFromGlobal(pos).y() - old_geometry.y()
+                               )
+            window.updateGeometry()
+
+        elif dimension is self.resize_regions["bottom-left"]:
+            window.setGeometry(self.mapFromGlobal(pos).x(),
+                               old_geometry.y(),
+                               old_geometry.width() - (self.mapFromGlobal(pos).x() - old_geometry.x()),
+                               self.mapFromGlobal(pos).y() - old_geometry.y()
+                               )
+            window.updateGeometry()
+        elif dimension is self.resize_regions["top-right"]:
+            window.setGeometry(old_geometry.x(),
+                               self.mapFromGlobal(pos).y(),
+                               self.mapFromGlobal(pos).x() - old_geometry.x(),
+                               old_geometry.height() - (self.mapFromGlobal(pos).y() - old_geometry.y()),
+                               )
+            window.updateGeometry()
+        elif dimension is self.resize_regions["left"]:
+            self.setCursor(Qt.SizeHorCursor)
+        elif dimension is self.resize_regions["right"]:
+            self.setCursor(Qt.SizeHorCursor)
+        elif dimension is self.resize_regions["top"]:
+            self.setCursor(Qt.SizeVerCursor)
+        elif dimension is self.resize_regions["bottom"]:
+            self.setCursor(Qt.SizeVerCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
 
     def mousePressEvent(self, event):
         # print("You clicked!")
         child = self.childAt(event.pos())
         if child:
             print("You clicked on my child")
-            if type(child) is MHeaderBar:
-                child.getWindow().raise_()
+            # Test to see if we are resizing a window
+            x = child.mapFromGlobal(event.globalPos()).x()
+            y = child.mapFromGlobal(event.globalPos()).y()
+            resize_region = self.mouse_is_over_resize_region(event.globalPos())
+            print("Resize dimension:", resize_region)
+            if resize_region:
+                self.resize_dimension = resize_region
+                if type(child) is MHeaderBar:
+                    self.window = child.getWindow()
+                elif type(child) is MWindow:
+                    self.window = child
 
+            # Test to see if we are clicking on the header bar (window drag)
+            elif type(child) is MHeaderBar:
                 # print("You clicked on my header")
                 self.process_move = True
                 self.window = child.getWindow()
 
                 # Decouple the window we are moving if it is embedded in another layout
                 if self.window.parent() is not self:
-                    global_pos = event.pos()
+                    global_pos = event.globalPos()
                     offset_pos = self.window.mapFromGlobal(global_pos)
                     self.decouple(self.window)
-
-                    self.window.move(global_pos - offset_pos)
-                self.move_offset = event.pos() - self.window.pos()
+                    # Move the window in the domain fo the main window
+                    self.window.move(self.mapFromGlobal(global_pos))
+                self.move_offset = event.globalPos() - self.mapToGlobal(self.window.pos())
                 event.accept()
-            else:
+            # Test to see if we are just clicking on a window
+            elif type(child) is MWindow:
                 child.raise_()
         else:
             event.accept()
@@ -119,7 +300,8 @@ class MWindowManager(QtWidgets.QFrame):
     def mouseReleaseEvent(self, event):
         # print("You released!")
         self.process_move = False
-
+        self.resize_dimension = self.resize_regions["none"]
+       # self.resize_dimension = self.resize_regions["none"]
         # Figure out if we are above another window
         for child in self.children():
             if self.window is not child:
@@ -140,7 +322,10 @@ class MWindowManager(QtWidgets.QFrame):
         event.accept()
 
     def mouseMoveEvent(self, event):
-        if self.process_move:
+        if self.resize_dimension:
+            self.move_window_dimension_to(self.window, self.resize_dimension, event.globalPos())
+
+        elif self.process_move:
             self.window.move(event.pos() - self.move_offset)
 
             for child in self.children():
@@ -150,9 +335,8 @@ class MWindowManager(QtWidgets.QFrame):
                         child.focus_drop_region(event.globalPos())
                     else:
                         child.hide_drop_regions()
-
-
-            event.accept()
+        else:
+            self.update_cursor_shape(event.globalPos())
 
     def _remove_child_window(self, child_window):
         self.child_windows.remove(child_window)
