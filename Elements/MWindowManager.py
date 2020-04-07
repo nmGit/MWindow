@@ -6,6 +6,7 @@ from Management.MWindow import MWindow
 from Elements.MSplitter import MSplitter
 from Elements.MHeaderBar import MHeaderBar
 
+import json
 
 class MWindowManager(QtWidgets.QFrame):
 
@@ -22,6 +23,9 @@ class MWindowManager(QtWidgets.QFrame):
         self.window = None
         self.setMouseTracking(True)
         self.resize_dimension = self.resize_regions["none"]
+
+    def serialize(self):
+        self.dump_to_dictionary()
 
     def add_window(self, widget, title):
         win = MWindow(widget, title)
@@ -240,6 +244,7 @@ class MWindowManager(QtWidgets.QFrame):
                                self.mapFromGlobal(pos).y() - old_geometry.y()
                                )
             window.updateGeometry()
+
         elif dimension is self.resize_regions["top-right"]:
             window.setGeometry(old_geometry.x(),
                                self.mapFromGlobal(pos).y(),
@@ -247,14 +252,39 @@ class MWindowManager(QtWidgets.QFrame):
                                old_geometry.height() - (self.mapFromGlobal(pos).y() - old_geometry.y()),
                                )
             window.updateGeometry()
+
         elif dimension is self.resize_regions["left"]:
-            self.setCursor(Qt.SizeHorCursor)
+            window.setGeometry(old_geometry.x() + (self.mapFromGlobal(pos).x() - old_geometry.x()),
+                               old_geometry.y(),
+                               old_geometry.width() - (self.mapFromGlobal(pos).x() - old_geometry.x()),
+                               old_geometry.height(),
+                               )
+            window.updateGeometry()
+
         elif dimension is self.resize_regions["right"]:
-            self.setCursor(Qt.SizeHorCursor)
+            window.setGeometry(old_geometry.x(),
+                               old_geometry.y(),
+                               self.mapFromGlobal(pos).x() - old_geometry.x(),
+                               old_geometry.height(),
+                               )
+            window.updateGeometry()
+
         elif dimension is self.resize_regions["top"]:
-            self.setCursor(Qt.SizeVerCursor)
+            window.setGeometry(old_geometry.x(),
+                               self.mapFromGlobal(pos).y(),
+                               old_geometry.width(),
+                               old_geometry.height() - (self.mapFromGlobal(pos).y() - old_geometry.y()),
+                               )
+            window.updateGeometry()
+
         elif dimension is self.resize_regions["bottom"]:
-            self.setCursor(Qt.SizeVerCursor)
+            window.setGeometry(old_geometry.x(),
+                               old_geometry.y(),
+                               old_geometry.width(),
+                               self.mapFromGlobal(pos).y() - old_geometry.y(),
+                               )
+            window.updateGeometry()
+
         else:
             self.setCursor(Qt.ArrowCursor)
 

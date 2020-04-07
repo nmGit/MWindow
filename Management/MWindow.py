@@ -51,6 +51,7 @@ class MWindow(QFrame):
         self.setMinimumHeight(24)
         self.setMinimumWidth(128)
         self.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+
     def get_content(self):
         return self.widget
 
