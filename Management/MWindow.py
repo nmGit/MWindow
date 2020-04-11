@@ -156,3 +156,6 @@ class MWindow(QFrame):
 
     def _add_child_window(self, child_window):
         self.child_windows.append(child_window)
+
+    def __str__(self):
+        return self.get_title()
