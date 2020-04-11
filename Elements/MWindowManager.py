@@ -1,5 +1,5 @@
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import QPoint
+from PyQt5.QtCore import QPoint, pyqtSignal
 from PyQt5.QtCore import Qt
 
 from Management.MWindow import MWindow
@@ -8,7 +8,12 @@ from Elements.MHeaderBar import MHeaderBar
 
 import json
 
+import pprint
+pp = pprint.PrettyPrinter(indent=2, width=1)
+
 class MWindowManager(QtWidgets.QFrame):
+
+    window_hierarchy_updated_sig = pyqtSignal()
 
     resize_regions = {"none": 0, "top": 1, "bottom": 2, "left": 3, "right": 4, "top-left": 5, "top-right": 6,
                       "bottom-left": 7, "bottom-right": 8}
@@ -23,6 +28,7 @@ class MWindowManager(QtWidgets.QFrame):
         self.window = None
         self.setMouseTracking(True)
         self.resize_dimension = self.resize_regions["none"]
+        self.window_hierarchy = {}
 
     def serialize(self):
         self.dump_to_dictionary()
@@ -36,9 +42,29 @@ class MWindowManager(QtWidgets.QFrame):
         win.move(0, 0)
 
         return win
-    
+
+    def remove_window(self, window):
+        self.child_windows.remove(window)
+        window.deleteLater()
+
     def get_title(self):
         return "Main window"
+
+    def get_window_hierarchy(self):
+        return self.window_hierarchy
+
+    def construct_window_hierarcy(self):
+        self.window_hierarchy = {}
+        self._add_children_to_dict(self.window_hierarchy, self)
+        self.window_hierarchy_updated_sig.emit()
+
+    def _add_children_to_dict(self, dict_, parent):
+        # pp.pprint(self.window_hierarchy)
+        children = parent.get_child_windows()
+        for child in children:
+            dict_[str(child)] = {}
+            self._add_children_to_dict(dict_[str(child)], child)
+
 
     def decouple(self, win, width = None, height = None):
         orig_position = win.mapToGlobal(win.pos())
@@ -61,20 +87,25 @@ class MWindowManager(QtWidgets.QFrame):
             win.move(orig_position_mapped_to_main_window)
 
         win.updateGeometry()
-        children_windows = old_parent.get_child_windows()
+        children_windows = [child for child in old_parent.get_child_windows()]
 
         if(len(children_windows) == 1):
             orig_width = children_windows[0].width()
             orig_height = children_windows[0].height()
             self.decouple(children_windows[0], orig_width, orig_height)
             print("Deleting", old_parent.get_title())
-            old_parent.deleteLater()
+            self.remove_window(old_parent)
+        else:
+            other_content = old_parent.get_content()
+            if(len(children_windows) > 2):
+                new_window = self.add_window(other_content, "Hi")
+                for window in children_windows:
+                    window.set_parent_window(new_window)
+            #print("deleting", old_parent)
+            #old_parent.setStyleSheet("background-color:purple")
+            #self.remove_window(old_parent)
 
         #old_parent.setParent(None)
-        print("deleting", old_parent)
-        old_parent.setStyleSheet("background-color:purple")
-
-        #old_parent.deleteLater()
 
         win.show()
         return win
@@ -85,8 +116,9 @@ class MWindowManager(QtWidgets.QFrame):
             print("You dropped a window on a splitter")
             # Take out the existing splitter and its contents
             existing_splitter = win1.get_content()
-            existing_windows = win1.get_child_windows()
-
+            print("Content", existing_splitter)
+            existing_windows = [child for child in win1.get_child_windows()]
+            print("Existing windows", [str(win) for win in existing_windows])
             new_splitter = MSplitter()
 
             # Add the existing splitter to the new splitter as a child
@@ -105,13 +137,14 @@ class MWindowManager(QtWidgets.QFrame):
 
             # Delete win2 and win1. Their contents has been removed and combined in a new window
             print("Deleting", win1.get_title())
-            win1.deleteLater()
+            self.remove_window(win1)
 
         elif type(win2.get_content()) is MSplitter:
             print("You dropped a splitter on a window")
             # Take out the existing splitter and its contents
             existing_splitter = win2.get_content()
-            existing_windows = win2.get_child_windows()
+            # Create a copy because we need to modify the list
+            existing_windows = [child for child in win2.get_child_windows()]
 
             new_splitter = MSplitter()
 
@@ -131,7 +164,7 @@ class MWindowManager(QtWidgets.QFrame):
 
             # Delete win2 and win1. Their contents has been removed and combined in a new window
             print("Deleting", win2.get_title())
-            win2.deleteLater()
+            self.remove_window(win2)
 
         else:
             new_splitter = MSplitter(self)
@@ -346,9 +379,10 @@ class MWindowManager(QtWidgets.QFrame):
                     if drop_region is child.get_drop_region("bottom"):
                         self.join_windows_in_splitter(self.window, child, "bottom")
                     print("You dropped a child on another child!")
-
                     break
             self._defocus_all_drop_regions()
+        self.construct_window_hierarcy()
+
         event.accept()
 
     def mouseMoveEvent(self, event):
@@ -368,6 +402,9 @@ class MWindowManager(QtWidgets.QFrame):
         else:
             self.update_cursor_shape(event.globalPos())
 
+    def get_child_windows(self):
+        return self.child_windows
+
     def _remove_child_window(self, child_window):
         self.child_windows.remove(child_window)
 
@@ -378,3 +415,6 @@ class MWindowManager(QtWidgets.QFrame):
         for child in self.children():
             if self.window is not child and type(child) is MWindow:
                 child.hide_drop_regions()
+
+    def __str__(self):
+        return "Main Window"
