@@ -18,7 +18,6 @@ class MSplitter(QFrame):
         self.main_splitter.show()
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
-
         #self.header_frame = MHeaderBar(self)
 
         #self.main_layout.addWidget(self.header_frame)
