@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QSizePolicy, QToolButton
-from Elements.MHeaderBar import MHeaderBar
+from ..Elements.MHeaderBar import MHeaderBar
 
 class MWindow(QFrame):
 
@@ -34,10 +34,9 @@ class MWindow(QFrame):
         self.drop_region_right_frame = QFrame(self)
         self.drop_region_bottom_frame = QFrame(self)
 
-        self.drop_region_stylesheet = "background-color: rgba(50, 50, 150, 100);" \
-                                 "border: 2px solid blue"
-        self.drop_region_focused_stylesheet = "background-color: rgba(50, 150, 50, 100);" \
-                                 "border: 2px solid blue"
+        self.drop_region_stylesheet = "background-color: rgba(50, 50, 150, 0);"
+        self.drop_region_focused_stylesheet = "background-color: rgba(50, 50, 80, 100);" \
+                                 "border: 2px solid grey"
 
         self.drop_region_top_frame.setStyleSheet(self.drop_region_stylesheet)
         self.drop_region_left_frame.setStyleSheet(self.drop_region_stylesheet)
@@ -51,6 +50,8 @@ class MWindow(QFrame):
         self.setMinimumHeight(24)
         self.setMinimumWidth(128)
         self.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+
+        self.uid = None
 
     def get_content(self):
         return self.widget
@@ -71,30 +72,30 @@ class MWindow(QFrame):
         window_geometry = self.geometry()
 
         self.drop_region_top_frame.setGeometry(
-            window_geometry.width()/3,
             0,
-            window_geometry.width()/3,
+            0,
+            window_geometry.width(),
             window_geometry.height()/5
         )
 
         self.drop_region_left_frame.setGeometry(
             0,
-            window_geometry.height()/3,
+            0,
             window_geometry.width()/5,
-            window_geometry.height()/3
+            window_geometry.height()
         )
 
         self.drop_region_right_frame.setGeometry(
             4 * window_geometry.width() / 5,
-            window_geometry.height()/3,
+            0,
             window_geometry.width()/5,
-            window_geometry.height()/3
+            window_geometry.height()
         )
 
         self.drop_region_bottom_frame.setGeometry(
-            window_geometry.width() / 3,
+            0,
             4 * window_geometry.height() / 5,
-            window_geometry.width() / 3,
+            window_geometry.width(),
             window_geometry.height() / 5
         )
 
@@ -107,6 +108,9 @@ class MWindow(QFrame):
         self.drop_region_top_frame.updateGeometry()
 
     def hide_drop_regions(self):
+        #print("hiding drop regions of", str(self))
+        for child in self.child_windows:
+            child.hide_drop_regions()
         self.drop_region_top_frame.hide()
         self.drop_region_left_frame.hide()
         self.drop_region_right_frame.hide()
@@ -150,6 +154,12 @@ class MWindow(QFrame):
 
     def get_child_windows(self):
         return self.child_windows
+
+    def set_uid(self, uid):
+        self.uid = uid
+
+    def get_uid(self):
+        return self.uid
 
     def _remove_child_window(self, child_window):
         self.child_windows.remove(child_window)
