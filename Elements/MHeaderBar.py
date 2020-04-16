@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QSizePolicy, QToolButton, QSplitter, QLabel
 from PyQt5.QtGui import QPixmap, QIcon
 
-
+import os
 
 class MHeaderBar(QFrame):
     def __init__(self, window):
@@ -19,8 +19,9 @@ class MHeaderBar(QFrame):
 
         self.title_label = QLabel()
         self.title_label.setStyleSheet(".QLabel{"
-                                       "    font: bold System;"
-                                       "    font-size: 18px; "
+                                       "    font: Bold System;"
+                                       "    font-size: 12px; "
+                                       "    background: none;"
                                        "    color: rgb(220,220,220);"
                                        "}")
         self.title_label.setMouseTracking(True)
@@ -29,9 +30,11 @@ class MHeaderBar(QFrame):
 
         self.header_layout.addStretch(3)
 
+        this_directory = '\\'.join(__file__.split('\\')[0:-1])
+
         self.minimize_button = QPushButton()
         self.minimize_button.setFlat(True)
-        minimize_pixmap = QPixmap("../Assets/minimize-24px.svg");
+        minimize_pixmap = QPixmap("%s/../Assets/minimize-24px.svg" % this_directory)
         minimize_icon = QIcon(minimize_pixmap)
         self.minimize_button.setStyleSheet(".QPushButton{background-color: rgb(150,150,50)}")
         self.minimize_button.setIcon(minimize_icon)
@@ -39,7 +42,7 @@ class MHeaderBar(QFrame):
 
         self.fullscreen_button = QPushButton()
         self.fullscreen_button.setFlat(True)
-        fullscreen_pixmap = QPixmap("../Assets/fullscreen-24px.svg");
+        fullscreen_pixmap = QPixmap("%s/../Assets/fullscreen-24px.svg"% this_directory);
         fullscreen_icon = QIcon(fullscreen_pixmap);
         self.fullscreen_button.setStyleSheet(".QPushButton{background-color: rgb(50,150,50)}")
         self.fullscreen_button.setIcon(fullscreen_icon)
@@ -48,7 +51,9 @@ class MHeaderBar(QFrame):
 
         self.exit_button = QPushButton()
         self.exit_button.setFlat(True)
-        close_pixmap = QPixmap("../Assets/close-24px.svg");
+        print(os.getcwd())
+        print(__file__)
+        close_pixmap = QPixmap("%s/../Assets/close-24px.svg"% this_directory);
         exit_icon = QIcon(close_pixmap);
         self.exit_button.setStyleSheet(".QPushButton{background-color: rgb(150,50,50)}")
         self.exit_button.setIcon(exit_icon)
