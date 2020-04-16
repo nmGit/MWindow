@@ -2,9 +2,9 @@ from PyQt5 import QtWidgets
 from PyQt5.QtCore import QPoint, pyqtSignal
 from PyQt5.QtCore import Qt
 
-from Management.MWindow import MWindow
-from Elements.MSplitter import MSplitter
-from Elements.MHeaderBar import MHeaderBar
+from ..Management.MWindow import MWindow
+from ..Elements.MSplitter import MSplitter
+from ..Elements.MHeaderBar import MHeaderBar
 
 import json
 
@@ -33,7 +33,8 @@ class MWindowManager(QtWidgets.QFrame):
     def serialize(self):
         self.dump_to_dictionary()
 
-    def add_window(self, widget, title):
+
+    def add_window(self, widget, title, uid = None):
         win = MWindow(widget, title)
         win.setParent(self)
         win.set_parent_window(self)
@@ -41,6 +42,11 @@ class MWindowManager(QtWidgets.QFrame):
         win.show()
         win.move(0, 0)
 
+        if self._validate_uid(uid):
+            win.set_uid(uid)
+        else:
+            uid = self._generate_window_uid()
+            win.set_uid(uid)
         return win
 
     def remove_window(self, window):
@@ -58,11 +64,37 @@ class MWindowManager(QtWidgets.QFrame):
         self._add_children_to_dict(self.window_hierarchy, self)
         self.window_hierarchy_updated_sig.emit()
 
+    def _generate_window_uid(self):
+        next_uid = 0
+        illegal_uids = []
+        for win in self.child_windows:
+            illegal_uids.append(win.get_uid())
+
+        while next_uid in illegal_uids:
+            next_uid += 1
+
+        return next_uid
+
+    def _validate_uid(self, uid):
+        if uid == None:
+            return False
+
+        illegal_uids = []
+        for win in self.child_windows:
+            illegal_uids.append(win.get_uid())
+        if uid in illegal_uids:
+            return False
+        else:
+            return True
+
     def _add_children_to_dict(self, dict_, parent):
         # pp.pprint(self.window_hierarchy)
         children = parent.get_child_windows()
         for child in children:
-            dict_[str(child)] = {}
+            dict_[str(child)] = {"position":(child.x(), child.y()),
+                                 "size":(child.width(), child.height()),
+                                 "uid":child.get_uid()}
+
             self._add_children_to_dict(dict_[str(child)], child)
 
 
@@ -321,11 +353,29 @@ class MWindowManager(QtWidgets.QFrame):
         else:
             self.setCursor(Qt.ArrowCursor)
 
+        if dimension != self.resize_regions["none"]:
+             content_rect = window.get_content().geometry()
+             window_rect = window.geometry()
+             content_rect.setHeight(window_rect.height())
+             content_rect.setWidth(window_rect.width())
+             #window.setGeometry(window_rect)
+
+    def high_z_child_window_at(self, pos):
+        highest_z_win = None
+        for win in self.child_windows:
+            if win.geometry().contains(win.mapFromGlobal(pos)):
+                return win
+
     def mousePressEvent(self, event):
-        # print("You clicked!")
-        child = self.childAt(event.pos())
+        #print("You clicked!")
+        child = self.childAt(self.mapFromGlobal(event.globalPos()))
         if child:
-            print("You clicked on my child")
+
+            #child.raise_()
+            win = self.high_z_child_window_at(event.globalPos())
+            if win:
+                win.raise_()
+            print("You clicked on my child", child)
             # Test to see if we are resizing a window
             x = child.mapFromGlobal(event.globalPos()).x()
             y = child.mapFromGlobal(event.globalPos()).y()
@@ -340,7 +390,7 @@ class MWindowManager(QtWidgets.QFrame):
 
             # Test to see if we are clicking on the header bar (window drag)
             elif type(child) is MHeaderBar:
-                # print("You clicked on my header")
+                print("You clicked on my header")
                 self.process_move = True
                 self.window = child.getWindow()
 
@@ -354,8 +404,7 @@ class MWindowManager(QtWidgets.QFrame):
                 self.move_offset = event.globalPos() - self.mapToGlobal(self.window.pos())
                 event.accept()
             # Test to see if we are just clicking on a window
-            elif type(child) is MWindow:
-                child.raise_()
+
         else:
             event.accept()
             return
@@ -368,7 +417,7 @@ class MWindowManager(QtWidgets.QFrame):
         # Figure out if we are above another window
         for child in self.children():
             if self.window is not child:
-                if child.geometry().contains(event.pos()):
+                if child.geometry().contains(self.mapFromGlobal(event.globalPos())):
                     drop_region = child.over_drop_regions(event.globalPos())
                     if drop_region is child.get_drop_region("top"):
                         self.join_windows_in_splitter(self.window, child, "top")
@@ -386,10 +435,12 @@ class MWindowManager(QtWidgets.QFrame):
         event.accept()
 
     def mouseMoveEvent(self, event):
+        #print("Mouse is moving!")
         if self.resize_dimension:
             self.move_window_dimension_to(self.window, self.resize_dimension, event.globalPos())
 
         elif self.process_move:
+            #print("Mouse is moving!")
             self.window.move(event.pos() - self.move_offset)
 
             for child in self.children():
@@ -413,7 +464,7 @@ class MWindowManager(QtWidgets.QFrame):
 
     def _defocus_all_drop_regions(self):
         for child in self.children():
-            if self.window is not child and type(child) is MWindow:
+            if type(child) is MWindow:
                 child.hide_drop_regions()
 
     def __str__(self):
