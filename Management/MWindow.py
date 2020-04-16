@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QSizePolicy, QToolButton
-from ..Elements.MHeaderBar import MHeaderBar
+from Elements.MHeaderBar import MHeaderBar
 
 class MWindow(QFrame):
 
@@ -20,6 +20,7 @@ class MWindow(QFrame):
         self.main_layout.addWidget(self.header_frame)
         self.main_layout.addStretch(0)
         self.main_layout.addWidget(self.widget)
+        self.main_layout.setStretchFactor(self.widget, 1)
 
         self.show()
 

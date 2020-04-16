@@ -1,9 +1,9 @@
-from PyQt5.QtWidgets import QTreeWidget, QTreeWidgetItem
+from PyQt5.QtWidgets import QTreeWidget, QTreeWidgetItem, QSizePolicy
 
 class DicionaryViewer(QTreeWidget):
     def __init__(self):
         super().__init__()
-
+        self.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
     def fill_item(self, item, value):
         item.setExpanded(True)
         if type(value) is dict:

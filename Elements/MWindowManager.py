@@ -2,9 +2,9 @@ from PyQt5 import QtWidgets
 from PyQt5.QtCore import QPoint, pyqtSignal
 from PyQt5.QtCore import Qt
 
-from ..Management.MWindow import MWindow
-from ..Elements.MSplitter import MSplitter
-from ..Elements.MHeaderBar import MHeaderBar
+from Management.MWindow import MWindow
+from Elements.MSplitter import MSplitter
+from Elements.MHeaderBar import MHeaderBar
 
 import json
 
@@ -61,6 +61,7 @@ class MWindowManager(QtWidgets.QFrame):
 
     def construct_window_hierarcy(self):
         self.window_hierarchy = {}
+        #for win in self.child_windows:
         self._add_children_to_dict(self.window_hierarchy, self)
         self.window_hierarchy_updated_sig.emit()
 
@@ -86,16 +87,59 @@ class MWindowManager(QtWidgets.QFrame):
             return False
         else:
             return True
+    def get_child_windows(self):
+        return self.child_windows
+
+    def get_content(self):
+        return self.child_windows
 
     def _add_children_to_dict(self, dict_, parent):
         # pp.pprint(self.window_hierarchy)
-        children = parent.get_child_windows()
-        for child in children:
-            dict_[str(child)] = {"position":(child.x(), child.y()),
-                                 "size":(child.width(), child.height()),
-                                 "uid":child.get_uid()}
+        item_to_index = parent
+        if type(parent) is MWindow and type(parent.get_content()) is MSplitter:
+            item_to_index = parent.get_content()
 
-            self._add_children_to_dict(dict_[str(child)], child)
+        if type(item_to_index) is MSplitter:
+            #dict_ = {"position": (parent.x(), parent.y()),
+            #                     "size": (parent.width(), parent.height()),
+            #                     "uid": parent.get_uid()}
+
+            splitter = item_to_index
+            parent_key = None
+
+            if type(parent) is MWindow:
+                parent_key = str(parent)
+                dict_ = dict_[parent_key]
+            elif type(parent) is MSplitter:
+                pass
+
+            dict_["splitter"] = {}
+            # dict_[str(child)]["splitter"]["position"] = splitter.get_position()
+            dict_["splitter"]["orientation"] = splitter.get_orientation()
+            dict_["splitter"] = {}
+            content_1 = splitter.get_item_at(0)
+            content_2 = splitter.get_item_at(1)
+            if content_1:
+                self._add_children_to_dict(dict_["splitter"], content_1)
+            if content_2:
+                self._add_children_to_dict(dict_["splitter"], content_2)
+        else:
+            children = parent.get_child_windows()
+            if len(children) == 0:
+                dict_[str(parent)] = {}
+                dict_[str(parent)]["position"] = (parent.x(), parent.y())
+                dict_[str(parent)]["size"] = (parent.width(), parent.height())
+                dict_[str(parent)]["uid"] = parent.get_uid()
+            else:
+                for child in children:
+                    dict_[str(child)] = {"position": (child.x(), child.y()),
+                                         "size": (child.width(), child.height()),
+                                         "uid": child.get_uid()}
+
+                    self._add_children_to_dict(dict_, child)
+
+            #else:
+            #    self._add_children_to_dict(dict_[str(child)]["splitter"], child)
 
 
     def decouple(self, win, width = None, height = None):
@@ -103,6 +147,9 @@ class MWindowManager(QtWidgets.QFrame):
 
 
         old_parent = win.get_parent_window()
+
+
+
         win.setParent(self)
         win.set_parent_window(self)
 

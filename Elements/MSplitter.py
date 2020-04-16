@@ -4,6 +4,8 @@ from PyQt5.QtCore import Qt
 from . MHeaderBar import MHeaderBar
 class MSplitter(QFrame):
 
+    VERTICAL = 'vertical'
+    HORIZONTAL = 'horizontal'
 
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -39,6 +41,7 @@ class MSplitter(QFrame):
 
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
+        self.orientation = None
 
     def add_content(self, content, location = None):
         if location is None:
@@ -47,23 +50,35 @@ class MSplitter(QFrame):
         elif location is "top":
             self.main_splitter.setOrientation(Qt.Vertical)
             self.main_splitter.insertWidget(0, content)
+            self.orientation = self.VERTICAL
 
         elif location is "left":
             self.main_splitter.setOrientation(Qt.Horizontal)
             self.main_splitter.insertWidget(0, content)
+            self.orientation = self.HORIZONTAL
 
         elif location is "right":
             self.main_splitter.setOrientation(Qt.Horizontal)
             self.main_splitter.insertWidget(1, content)
+            self.orientation = self.HORIZONTAL
 
         elif location is "bottom":
             self.main_splitter.setOrientation(Qt.Vertical)
             self.main_splitter.insertWidget(1, content)
+            self.orientation = self.VERTICAL
 
         self.updateGeometry()
+
+    def get_orientation(self):
+        return self.orientation
+
+    def get_position(self):
+        return self.main_splitter.sizes()
 
     def get_num_widgets(self):
         return self.main_splitter.count()
 
+    def get_item_at(self, index):
+        return self.main_splitter.widget(index)
 
 
