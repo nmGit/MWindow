@@ -29,6 +29,10 @@ class MWindowManager(QtWidgets.QFrame):
         self.setMouseTracking(True)
         self.resize_dimension = self.resize_regions["none"]
         self.window_hierarchy = {}
+        self.uid = 0
+
+    def get_uid(self):
+        return self.uid
 
     def serialize(self):
         self.dump_to_dictionary()
@@ -41,6 +45,9 @@ class MWindowManager(QtWidgets.QFrame):
         win.setMouseTracking(True)
         win.show()
         win.move(0, 0)
+
+        if type(widget) is MSplitter:
+            widget.set_parent_window(win)
 
         if self._validate_uid(uid):
             win.set_uid(uid)
@@ -56,18 +63,131 @@ class MWindowManager(QtWidgets.QFrame):
     def get_title(self):
         return "Main window"
 
+    def serialize(self):
+        self.construct_window_hierarcy()
+        dict_ = self.get_window_hierarchy()
+        ser_data = json.dumps(dict_, indent=4)
+        return ser_data
+
+    def deserialize(self, ser_str, item_dict):
+        try:
+            if ser_str != '':
+                dict_ = json.loads(ser_str)
+            else:
+                dict_ = {}
+        except json.decoder.JSONDecodeError as e:
+            print("Could not decode window manager data. The data may be corrupt")
+            print(e)
+            dict_ = {}
+
+
+        if "MainWindow" in dict_.keys():
+
+            self._reconstruct_window(self, dict_["MainWindow"]["windows"], item_dict)
+            try:
+                self.setGeometry(dict_["MainWindow"]["position"][0],
+                                 dict_["MainWindow"]["position"][1],
+                                 dict_["MainWindow"]["size"][0],
+                                 dict_["MainWindow"]["size"][1])
+            except KeyError as e:
+                print("Could not find top-level position and size information. The data may have been corrupted")
+                print(e)
+
+        else:
+            for key, value in item_dict.items():
+                self.add_window(value[0], value[1], int(key))
+
+
+
+    def _reconstruct_window(self, parent, ser_data, item_dict):
+        def _place_window(location, value):
+            uid = value[list(value.keys())[0]]['uid']
+            position = value[list(value.keys())[0]]['position']
+            size = value[list(value.keys())[0]]['position']
+            content = item_dict[uid]
+            win = MWindow(content[0], content[1])
+            win.set_uid(uid)
+            win.setGeometry(position[0], position[1], size[0], size[1])
+            parent.add_content(win, location)
+
+        def _place_splitter(parent, location):
+            split = MSplitter(parent.get_parent_window())
+            parent.add_content(split, location)
+            self._reconstruct_window(split, value["splitter"], item_dict)
+            split.set_sizes(*value["splitter"]["sizes"])
+
+
+        for key, value in ser_data.items():
+            if type(value) is not dict:
+                continue
+            uid = value.get('uid', None)
+            if type(parent) is not MSplitter and uid:
+                content = item_dict.get(uid, None)
+                if content and type(parent) is MWindowManager and "splitter" not in value.keys():
+                    win = parent.add_window(content[0], key, uid)
+                    win.setGeometry(value["position"][0], value["position"][1],
+                                    value["size"][0], value["size"][1]
+                                    )
+
+                elif type(value) is dict and "splitter" in value.keys():
+                    split = MSplitter(None)
+                    win = parent.add_window(split, key, value["uid"])
+                    split.set_parent_window(win)
+
+                    self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
+                    #self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
+                    split.set_sizes(*value["splitter"]["sizes"])
+
+                    win.setGeometry(value['position'][0], value['position'][1], value['size'][0], value['size'][1])
+                    win.set_uid(None)
+
+            elif type(parent) is MSplitter:
+
+
+                if ser_data["orientation"] == MSplitter.VERTICAL:
+                    if "splitter" in value.keys() and key == "top or left":
+                        _place_splitter(parent, "top")
+                        #self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
+                    elif key == "top or left":
+                        _place_window('top', value)
+
+                    if "splitter" in value.keys() and key == "bottom or right":
+                        _place_splitter(parent, "bottom")
+                        #self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
+                    elif key == "bottom or right":
+                        _place_window('bottom', value)
+
+
+                if ser_data["orientation"] == MSplitter.HORIZONTAL:
+                    if "splitter" in value.keys() and key == "top or left":
+                        _place_splitter(parent, "left")
+                       # self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
+                    elif key == "top or left":
+                        _place_window('left', value)
+
+                    if "splitter" in value.keys() and key == "bottom or right":
+                        _place_splitter(parent, "right")
+                        #self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
+                    elif key == "bottom or right":
+                        _place_window('right', value)
+
+                #parent.add_content()
     def get_window_hierarchy(self):
         return self.window_hierarchy
 
     def construct_window_hierarcy(self):
         self.window_hierarchy = {}
+        self.window_hierarchy["MainWindow"] = {}
+        self.window_hierarchy["MainWindow"]["windows"] = {}
         #for win in self.child_windows:
-        self._add_children_to_dict(self.window_hierarchy, self)
+        self._add_children_to_dict(self.window_hierarchy["MainWindow"]["windows"], self)
+        self.window_hierarchy["MainWindow"]["position"] = (self.x(), self.y())
+        self.window_hierarchy["MainWindow"]["size"] = (self.width(), self.height())
         self.window_hierarchy_updated_sig.emit()
 
     def _generate_window_uid(self):
-        next_uid = 0
-        illegal_uids = []
+        next_uid = 1
+        illegal_uids = [0] # 0 is reserved for the main window
         for win in self.child_windows:
             illegal_uids.append(win.get_uid())
 
@@ -115,14 +235,18 @@ class MWindowManager(QtWidgets.QFrame):
 
             dict_["splitter"] = {}
             # dict_[str(child)]["splitter"]["position"] = splitter.get_position()
-            dict_["splitter"]["orientation"] = splitter.get_orientation()
+
             dict_["splitter"] = {}
             content_1 = splitter.get_item_at(0)
             content_2 = splitter.get_item_at(1)
+            dict_["splitter"]["top or left"] = {}
+            dict_["splitter"]["bottom or right"] = {}
             if content_1:
-                self._add_children_to_dict(dict_["splitter"], content_1)
+                self._add_children_to_dict(dict_["splitter"]["top or left"], content_1)
             if content_2:
-                self._add_children_to_dict(dict_["splitter"], content_2)
+                self._add_children_to_dict(dict_["splitter"]["bottom or right"], content_2)
+            dict_["splitter"]["orientation"] = splitter.get_orientation()
+            dict_["splitter"]["sizes"] = splitter.get_sizes()
         else:
             children = parent.get_child_windows()
             if len(children) == 0:
@@ -166,23 +290,28 @@ class MWindowManager(QtWidgets.QFrame):
             win.move(orig_position_mapped_to_main_window)
 
         win.updateGeometry()
-        children_windows = [child for child in old_parent.get_child_windows()]
+        children_windows = [child for child in old_parent.get_child_windows() if type(child) is MWindow]
+        children_elements = [child for child in old_parent.get_child_windows() if type(child) is MWindow]
 
         if(len(children_windows) == 1):
             orig_width = children_windows[0].width()
             orig_height = children_windows[0].height()
             self.decouple(children_windows[0], orig_width, orig_height)
-            print("Deleting", old_parent.get_title())
-            self.remove_window(old_parent)
+            #print("Deleting", old_parent.get_title())
+            #self.remove_window(old_parent)
         else:
+            pass
             other_content = old_parent.get_content()
-            if(len(children_windows) > 2):
-                new_window = self.add_window(other_content, "Hi")
+            if(len(children_windows) >= 2):
+                new_title = ''
                 for window in children_windows:
+                    new_title = new_title + str(window) + ","
+                new_window = self.add_window(other_content, new_title)
+                for window in children_elements:
                     window.set_parent_window(new_window)
             #print("deleting", old_parent)
-            #old_parent.setStyleSheet("background-color:purple")
-            #self.remove_window(old_parent)
+            old_parent.setStyleSheet("background-color:purple")
+            self.remove_window(old_parent)
 
         #old_parent.setParent(None)
 
@@ -198,16 +327,16 @@ class MWindowManager(QtWidgets.QFrame):
             print("Content", existing_splitter)
             existing_windows = [child for child in win1.get_child_windows()]
             print("Existing windows", [str(win) for win in existing_windows])
-            new_splitter = MSplitter()
+            new_splitter = MSplitter(None)
+
+            # Create a new window with the new splitter
+            new_window = self.add_window(new_splitter, "%s, %s" % (win1.get_title(), win2.get_title()))
 
             # Add the existing splitter to the new splitter as a child
             new_splitter.add_content(existing_splitter)
 
             # Add the new widget to the new splitter at the specified location
             new_splitter.add_content(win2, location)
-
-            # Create a new window with the new splitter
-            new_window = self.add_window(new_splitter, "%s, %s" % (win1.get_title(), win2.get_title()))
 
             # Now we need to re-parent all existing windows as well as the one that was dragged in
             for window in existing_windows:
@@ -225,7 +354,10 @@ class MWindowManager(QtWidgets.QFrame):
             # Create a copy because we need to modify the list
             existing_windows = [child for child in win2.get_child_windows()]
 
-            new_splitter = MSplitter()
+            new_splitter = MSplitter(None)
+
+            # Create a new window with the new splitter
+            new_window = self.add_window(new_splitter, "%s, %s" % (win1.get_title(), win2.get_title()))
 
             # Add the existing splitter to the new splitter as a child
             new_splitter.add_content(existing_splitter)
@@ -233,8 +365,6 @@ class MWindowManager(QtWidgets.QFrame):
             # Add the new widget to the new splitter at the specified location
             new_splitter.add_content(win1, location)
 
-            # Create a new window with the new splitter
-            new_window = self.add_window(new_splitter, "%s, %s" % (win1.get_title(), win2.get_title()))
 
             # Now we need to re-parent all existing windows as well as the one that was dragged in
             for window in existing_windows:
@@ -246,12 +376,13 @@ class MWindowManager(QtWidgets.QFrame):
             self.remove_window(win2)
 
         else:
-            new_splitter = MSplitter(self)
+            new_splitter = MSplitter(None)
+
+            new_win = self.add_window(new_splitter, "%s, %s" % (win1.get_title(), win2.get_title()))
 
             new_splitter.add_content(win2)
             new_splitter.add_content(win1, location)
 
-            new_win = self.add_window(new_splitter, "%s, %s" % (win1.get_title(), win2.get_title()))
 
             win1.set_parent_window(new_win)
             win2.set_parent_window(new_win)

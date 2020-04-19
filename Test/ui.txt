@@ -1,0 +1,113 @@
+{
+    "MainWindow": {
+        "windows": {
+            "Hello world": {
+                "position": [
+                    0,
+                    0
+                ],
+                "size": [
+                    175,
+                    47
+                ],
+                "uid": 1
+            },
+            "Colors, Fonts, Window Hierarchy, Files": {
+                "position": [
+                    150,
+                    14
+                ],
+                "size": [
+                    1622,
+                    987
+                ],
+                "uid": 2,
+                "splitter": {
+                    "top or left": {
+                        "splitter": {
+                            "top or left": {
+                                "splitter": {
+                                    "top or left": {
+                                        "Window Hierarchy": {
+                                            "position": [
+                                                0,
+                                                0
+                                            ],
+                                            "size": [
+                                                479,
+                                                591
+                                            ],
+                                            "uid": 5
+                                        }
+                                    },
+                                    "bottom or right": {
+                                        "Files": {
+                                            "position": [
+                                                488,
+                                                0
+                                            ],
+                                            "size": [
+                                                478,
+                                                591
+                                            ],
+                                            "uid": 3
+                                        }
+                                    },
+                                    "orientation": "horizontal",
+                                    "sizes": [
+                                        479,
+                                        478
+                                    ]
+                                }
+                            },
+                            "bottom or right": {
+                                "Fonts": {
+                                    "position": [
+                                        0,
+                                        604
+                                    ],
+                                    "size": [
+                                        970,
+                                        341
+                                    ],
+                                    "uid": 2
+                                }
+                            },
+                            "orientation": "vertical",
+                            "sizes": [
+                                595,
+                                341
+                            ]
+                        }
+                    },
+                    "bottom or right": {
+                        "Colors": {
+                            "position": [
+                                983,
+                                0
+                            ],
+                            "size": [
+                                631,
+                                949
+                            ],
+                            "uid": 4
+                        }
+                    },
+                    "orientation": "horizontal",
+                    "sizes": [
+                        974,
+                        631
+                    ]
+                }
+            }
+        },
+        "position": [
+            -1920,
+            23
+        ],
+        "size": [
+            1920,
+            1017
+        ]
+    }
+}
