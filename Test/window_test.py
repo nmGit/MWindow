@@ -1,9 +1,8 @@
 
-from Elements.MWindowManager import MWindowManager
+from Management.MWindowManager import MWindowManager
 from Widgets.DictionaryViewer import DicionaryViewer
 import atexit
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFontDialog, QFileDialog, QColorDialog
-import json
+from PyQt5.QtWidgets import QApplication, QLabel, QFontDialog, QFileDialog, QColorDialog
 
 
 def refresh_win_heirarchy():

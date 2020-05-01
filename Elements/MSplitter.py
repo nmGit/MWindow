@@ -3,8 +3,9 @@ from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QSize
 from PyQt5.QtCore import Qt
 from . MHeaderBar import MHeaderBar
 from Management.MWindow import MWindow
+from Management.MContainer import MContainer
 
-class MSplitter(QFrame):
+class MSplitter(QFrame, MContainer):
 
     VERTICAL = 'vertical'
     HORIZONTAL = 'horizontal'
@@ -16,9 +17,9 @@ class MSplitter(QFrame):
         # Construct top-level window elements
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
-        self.parent_window = None
+        self.parent_container = None
 
-        self.set_parent_window(parent_window)
+        self.set_parent_container(parent_window)
 
         self.main_splitter = QSplitter()
         self.main_splitter.setObjectName("main_splitter")
@@ -78,7 +79,7 @@ class MSplitter(QFrame):
             self.main_splitter.insertWidget(1, content)
             self.orientation = self.VERTICAL
 
-        content.set_parent_window(self.get_parent_window())
+        content.set_parent_container(self.get_parent_container())
         self.updateGeometry()
 
     def get_orientation(self):
@@ -92,27 +93,27 @@ class MSplitter(QFrame):
 
     def get_item_at(self, index):
         return self.main_splitter.widget(index)
-
-    def get_parent_window(self):
-        return self.parent_window
-
-    def set_parent_window(self, win):
-
-        if type(win) is MWindow or win is None:
-
-            # Remove self from old parent
-            if self.parent_window is not None:
-                self.parent_window._remove_child_window(self)
-
-            # Add self to new parent
-            if (win is not None):
-                win._add_child_window(self)
-
-            # Set local reference to parent
-            self.parent_window = win
-
-        else:
-            raise TypeError("Parent window must be type MWindow, not %s" % (str(type(win))))
+    #
+    # def get_parent_container(self):
+    #     return self.parent_container
+    #
+    # def set_parent_container(self, win):
+    #
+    #     if type(win) is MWindow or win is None:
+    #
+    #         # Remove self from old parent
+    #         if self.parent_container is not None:
+    #             self.parent_container._remove_child_container(self)
+    #
+    #         # Add self to new parent
+    #         if (win is not None):
+    #             win._add_child_container(self)
+    #
+    #         # Set local reference to parent
+    #         self.parent_container = win
+    #
+    #     else:
+    #         raise TypeError("Parent window must be type %s, not %s" % (str(type(MWindow)), str(type(win))))
 
     def show_drop_regions(self):
         pass

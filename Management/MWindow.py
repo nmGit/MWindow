@@ -1,12 +1,17 @@
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QSizePolicy, QToolButton
 from Elements.MHeaderBar import MHeaderBar
+from Management.MContainer import MContainer
 
-class MWindow(QFrame):
+class MWindow(QFrame, MContainer):
 
-    def __init__(self, widget, title):
+    def __init__(self, content, title):
         super().__init__()
-        self.widget = widget
-        self.widget.setMouseTracking(True)
+
+#        if not (type(content) is MContainer):
+#            raise TypeError("Expected type %s, got %s" % (str(MContainer), type(content)))
+
+        self.content = content
+        self.content.setMouseTracking(True)
         self.setObjectName("main_frame")
         # Construct top-level window elements
 
@@ -19,16 +24,13 @@ class MWindow(QFrame):
 
         self.main_layout.addWidget(self.header_frame)
         self.main_layout.addStretch(0)
-        self.main_layout.addWidget(self.widget)
-        self.main_layout.setStretchFactor(self.widget, 1)
+        self.main_layout.addWidget(self.content)
+        self.main_layout.setStretchFactor(self.content, 1)
 
         self.show()
 
         self.setStyleSheet(self.styleSheet() + "QFrame#main_frame{border: 2px solid black}\r\n"
                                                "QFrame#main_frame{background-color:rgb(200,200,200)}")
-
-        self.child_windows = []
-        self.parent_window = None
 
         self.drop_region_top_frame = QFrame(self)
         self.drop_region_left_frame = QFrame(self)
@@ -55,19 +57,13 @@ class MWindow(QFrame):
         self.uid = None
 
     def get_content(self):
-        return self.widget
+        return self.content
 
     def set_title(self, title):
         self.header_frame.setTitle(title)
 
     def get_title(self):
         return self.header_frame.getTitle()
-
-    def get_parent_window(self):
-        return self.parent_window
-
-    def get_child_windows(self):
-        return self.child_windows
 
     def show_drop_regions(self):
         window_geometry = self.geometry()
@@ -110,7 +106,7 @@ class MWindow(QFrame):
 
     def hide_drop_regions(self):
         #print("hiding drop regions of", str(self))
-        for child in self.child_windows:
+        for child in self.child_containers:
             child.hide_drop_regions()
         self.drop_region_top_frame.hide()
         self.drop_region_left_frame.hide()
@@ -141,32 +137,11 @@ class MWindow(QFrame):
     def get_drop_region(self, key):
         return self.drop_regions[key]
 
-    def set_parent_window(self, new_parent_window):
-        # Remove self from old parent
-        if self.parent_window is not None:
-            self.parent_window._remove_child_window(self)
-
-        # Add self to new parent
-        if(new_parent_window is not None):
-            new_parent_window._add_child_window(self)
-
-        # Set local reference to parent
-        self.parent_window = new_parent_window
-
-    def get_child_windows(self):
-        return self.child_windows
-
     def set_uid(self, uid):
         self.uid = uid
 
     def get_uid(self):
         return self.uid
-
-    def _remove_child_window(self, child_window):
-        self.child_windows.remove(child_window)
-
-    def _add_child_window(self, child_window):
-        self.child_windows.append(child_window)
 
     def __str__(self):
         return self.get_title()

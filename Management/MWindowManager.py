@@ -5,13 +5,14 @@ from PyQt5.QtCore import Qt
 from Management.MWindow import MWindow
 from Elements.MSplitter import MSplitter
 from Elements.MHeaderBar import MHeaderBar
+from Management.MContainer import MContainer
 
 import json
 
 import pprint
 pp = pprint.PrettyPrinter(indent=2, width=1)
 
-class MWindowManager(QtWidgets.QFrame):
+class MWindowManager(QtWidgets.QFrame, MContainer):
 
     window_hierarchy_updated_sig = pyqtSignal()
 
@@ -23,7 +24,7 @@ class MWindowManager(QtWidgets.QFrame):
         self.setObjectName("win_manage")
         self.setStyleSheet(self.styleSheet() + "QFrame#win_manage{background: rgb(50,50, 50)}")
         self.process_move = False
-        self.child_windows = []
+        self.child_containers = []
         self.move_offset = QPoint(0,0)
         self.window = None
         self.setMouseTracking(True)
@@ -41,13 +42,13 @@ class MWindowManager(QtWidgets.QFrame):
     def add_window(self, widget, title, uid = None):
         win = MWindow(widget, title)
         win.setParent(self)
-        win.set_parent_window(self)
+        win.set_parent_container(self)
         win.setMouseTracking(True)
         win.show()
         win.move(0, 0)
 
         if type(widget) is MSplitter:
-            widget.set_parent_window(win)
+            widget.set_parent_container(win)
 
         if self._validate_uid(uid):
             win.set_uid(uid)
@@ -57,7 +58,7 @@ class MWindowManager(QtWidgets.QFrame):
         return win
 
     def remove_window(self, window):
-        self.child_windows.remove(window)
+        self.child_containers.remove(window)
         window.deleteLater()
 
     def get_title(self):
@@ -111,28 +112,50 @@ class MWindowManager(QtWidgets.QFrame):
             parent.add_content(win, location)
 
         def _place_splitter(parent, location):
-            split = MSplitter(parent.get_parent_window())
+            split = MSplitter(parent.get_parent_container())
             parent.add_content(split, location)
             self._reconstruct_window(split, value["splitter"], item_dict)
             split.set_sizes(*value["splitter"]["sizes"])
 
 
         for key, value in ser_data.items():
+            # This a base case.
+            # If we have reached a leaf then don't try to traverse the tree any further
             if type(value) is not dict:
                 continue
+
+            # Get the UID of the window that we are about to create. The UIDs of windows *must* remain
+            # consistent, as uid are keyed on by the application to determine which window goes where.
+            # it is up to the application to save the UIDs of its gui elements
             uid = value.get('uid', None)
+
+            # If a UID has been found and the parent isn't a splitter, then create the window
+            # if the parent is a splitter then there are a few extra steps to place the contents within the splitter
+            # at the correct location
+
+            # With the way this is set up, the next two if statements will only pass iff the parent is a floating window
+            # container. That's important because it allows the add_window call
             if type(parent) is not MSplitter and uid:
+
+                # Fetch a reference to the gui data (e.g. QWidget) that is going to be placed
                 content = item_dict.get(uid, None)
-                if content and type(parent) is MWindowManager and "splitter" not in value.keys():
+
+                # Ensure that the key (uid) was valid
+                # Ensure that we are not going to try to place a splitter. Doing so requires different steps.
+                if content and "splitter" not in value.keys():
                     win = parent.add_window(content[0], key, uid)
                     win.setGeometry(value["position"][0], value["position"][1],
                                     value["size"][0], value["size"][1]
                                     )
 
+                # Otherwise, if we are placing a splitter (which is an MContainer) then we have to make a recursive
+                # call that will take care of placing all children inside of the splitter.
                 elif type(value) is dict and "splitter" in value.keys():
+
+                    # Create a blank splitter and add it to the parent
                     split = MSplitter(None)
                     win = parent.add_window(split, key, value["uid"])
-                    split.set_parent_window(win)
+                    split.set_parent_container(win)
 
                     self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
                     #self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
@@ -142,8 +165,6 @@ class MWindowManager(QtWidgets.QFrame):
                     win.set_uid(None)
 
             elif type(parent) is MSplitter:
-
-
                 if ser_data["orientation"] == MSplitter.VERTICAL:
                     if "splitter" in value.keys() and key == "top or left":
                         _place_splitter(parent, "top")
@@ -188,7 +209,7 @@ class MWindowManager(QtWidgets.QFrame):
     def _generate_window_uid(self):
         next_uid = 1
         illegal_uids = [0] # 0 is reserved for the main window
-        for win in self.child_windows:
+        for win in self.child_containers:
             illegal_uids.append(win.get_uid())
 
         while next_uid in illegal_uids:
@@ -201,17 +222,17 @@ class MWindowManager(QtWidgets.QFrame):
             return False
 
         illegal_uids = []
-        for win in self.child_windows:
+        for win in self.child_containers:
             illegal_uids.append(win.get_uid())
         if uid in illegal_uids:
             return False
         else:
             return True
-    def get_child_windows(self):
-        return self.child_windows
+    # def get_child_windows(self):
+    #     return self.child_containers
 
     def get_content(self):
-        return self.child_windows
+        return self.child_containers
 
     def _add_children_to_dict(self, dict_, parent):
         # pp.pprint(self.window_hierarchy)
@@ -248,7 +269,7 @@ class MWindowManager(QtWidgets.QFrame):
             dict_["splitter"]["orientation"] = splitter.get_orientation()
             dict_["splitter"]["sizes"] = splitter.get_sizes()
         else:
-            children = parent.get_child_windows()
+            children = parent.get_child_container()
             if len(children) == 0:
                 dict_[str(parent)] = {}
                 dict_[str(parent)]["position"] = (parent.x(), parent.y())
@@ -270,12 +291,12 @@ class MWindowManager(QtWidgets.QFrame):
         orig_position = win.mapToGlobal(win.pos())
 
 
-        old_parent = win.get_parent_window()
+        old_parent = win.get_parent_container()
 
 
 
         win.setParent(self)
-        win.set_parent_window(self)
+        win.set_parent_container(self)
 
         # Take the global position from the window and map it to coordinates of the main window
         # Then move the window to that position
@@ -290,8 +311,8 @@ class MWindowManager(QtWidgets.QFrame):
             win.move(orig_position_mapped_to_main_window)
 
         win.updateGeometry()
-        children_windows = [child for child in old_parent.get_child_windows() if type(child) is MWindow]
-        children_elements = [child for child in old_parent.get_child_windows() if type(child) is MWindow]
+        children_windows = [child for child in old_parent.get_child_container() if type(child) is MWindow]
+        children_elements = [child for child in old_parent.get_child_container() if type(child) is MWindow]
 
         if(len(children_windows) == 1):
             orig_width = children_windows[0].width()
@@ -308,7 +329,7 @@ class MWindowManager(QtWidgets.QFrame):
                     new_title = new_title + str(window) + ","
                 new_window = self.add_window(other_content, new_title)
                 for window in children_elements:
-                    window.set_parent_window(new_window)
+                    window.set_parent_container(new_window)
             #print("deleting", old_parent)
             old_parent.setStyleSheet("background-color:purple")
             self.remove_window(old_parent)
@@ -325,7 +346,7 @@ class MWindowManager(QtWidgets.QFrame):
             # Take out the existing splitter and its contents
             existing_splitter = win1.get_content()
             print("Content", existing_splitter)
-            existing_windows = [child for child in win1.get_child_windows()]
+            existing_windows = [child for child in win1.get_child_container()]
             print("Existing windows", [str(win) for win in existing_windows])
             new_splitter = MSplitter(None)
 
@@ -340,8 +361,8 @@ class MWindowManager(QtWidgets.QFrame):
 
             # Now we need to re-parent all existing windows as well as the one that was dragged in
             for window in existing_windows:
-                window.set_parent_window(new_window)
-            win2.set_parent_window(new_window)
+                window.set_parent_container(new_window)
+            win2.set_parent_container(new_window)
 
             # Delete win2 and win1. Their contents has been removed and combined in a new window
             print("Deleting", win1.get_title())
@@ -352,7 +373,7 @@ class MWindowManager(QtWidgets.QFrame):
             # Take out the existing splitter and its contents
             existing_splitter = win2.get_content()
             # Create a copy because we need to modify the list
-            existing_windows = [child for child in win2.get_child_windows()]
+            existing_windows = [child for child in win2.get_child_container()]
 
             new_splitter = MSplitter(None)
 
@@ -368,8 +389,8 @@ class MWindowManager(QtWidgets.QFrame):
 
             # Now we need to re-parent all existing windows as well as the one that was dragged in
             for window in existing_windows:
-                window.set_parent_window(new_window)
-            win1.set_parent_window(new_window)
+                window.set_parent_container(new_window)
+            win1.set_parent_container(new_window)
 
             # Delete win2 and win1. Their contents has been removed and combined in a new window
             print("Deleting", win2.get_title())
@@ -384,8 +405,8 @@ class MWindowManager(QtWidgets.QFrame):
             new_splitter.add_content(win1, location)
 
 
-            win1.set_parent_window(new_win)
-            win2.set_parent_window(new_win)
+            win1.set_parent_container(new_win)
+            win2.set_parent_container(new_win)
 
 
 
@@ -540,7 +561,7 @@ class MWindowManager(QtWidgets.QFrame):
 
     def high_z_child_window_at(self, pos):
         highest_z_win = None
-        for win in self.child_windows:
+        for win in self.child_containers:
             if win.geometry().contains(win.mapFromGlobal(pos)):
                 return win
 
@@ -630,15 +651,15 @@ class MWindowManager(QtWidgets.QFrame):
                         child.hide_drop_regions()
         else:
             self.update_cursor_shape(event.globalPos())
-
-    def get_child_windows(self):
-        return self.child_windows
-
-    def _remove_child_window(self, child_window):
-        self.child_windows.remove(child_window)
-
-    def _add_child_window(self, child_window):
-        self.child_windows.append(child_window)
+    #
+    # def get_child_windows(self):
+    #     return self.child_containers
+    #
+    # def _remove_child_container(self, child_container):
+    #     self.child_containers.remove(child_container)
+    #
+    # def _add_child_container(self, child_container):
+    #     self.child_containers.append(child_container)
 
     def _defocus_all_drop_regions(self):
         for child in self.children():
