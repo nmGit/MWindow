@@ -2,10 +2,10 @@ from PyQt5 import QtWidgets
 from PyQt5.QtCore import QPoint, pyqtSignal
 from PyQt5.QtCore import Qt
 
-from Management.MWindow import MWindow
+from Elements.MWindow import MWindow
 from Elements.MSplitter import MSplitter
 from Elements.MHeaderBar import MHeaderBar
-from Management.MContainer import MContainer
+from Elements.MContainer import MContainer
 
 import json
 
@@ -168,27 +168,22 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
                 if ser_data["orientation"] == MSplitter.VERTICAL:
                     if "splitter" in value.keys() and key == "top or left":
                         _place_splitter(parent, "top")
-                        #self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
                     elif key == "top or left":
                         _place_window('top', value)
 
                     if "splitter" in value.keys() and key == "bottom or right":
                         _place_splitter(parent, "bottom")
-                        #self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
                     elif key == "bottom or right":
                         _place_window('bottom', value)
-
 
                 if ser_data["orientation"] == MSplitter.HORIZONTAL:
                     if "splitter" in value.keys() and key == "top or left":
                         _place_splitter(parent, "left")
-                       # self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
                     elif key == "top or left":
                         _place_window('left', value)
 
                     if "splitter" in value.keys() and key == "bottom or right":
                         _place_splitter(parent, "right")
-                        #self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
                     elif key == "bottom or right":
                         _place_window('right', value)
 

@@ -1,9 +1,6 @@
-from PyQt5.QtGui import QDrag, QCursor
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QSizePolicy, QToolButton, QSplitter
+from PyQt5.QtWidgets import QFrame, QVBoxLayout, QSizePolicy, QSplitter
 from PyQt5.QtCore import Qt
-from . MHeaderBar import MHeaderBar
-from Management.MWindow import MWindow
-from Management.MContainer import MContainer
+from Elements.MContainer import MContainer
 
 class MSplitter(QFrame, MContainer):
 

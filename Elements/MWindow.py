@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QSizePolicy, QToolButton
+from PyQt5.QtWidgets import QFrame, QVBoxLayout, QSizePolicy
 from Elements.MHeaderBar import MHeaderBar
-from Management.MContainer import MContainer
+from Elements.MContainer import MContainer
 
 class MWindow(QFrame, MContainer):
 
