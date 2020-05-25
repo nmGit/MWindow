@@ -1,18 +1,21 @@
 from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QTabBar
 from PyQt5.QtCore import QPoint, pyqtSignal
 from PyQt5.QtCore import Qt
 
 from Elements.MWindow import MWindow
 from Elements.MSplitter import MSplitter
 from Elements.MHeaderBar import MHeaderBar
-from Elements.MContainer import MContainer
+from Elements.MHierarchicalElement import MHierarchicalElement
+from Elements.MTabOrganizer import MTabOrganizer
+from Elements.MTab import MTab
 
 import json
 
 import pprint
 pp = pprint.PrettyPrinter(indent=2, width=1)
 
-class MWindowManager(QtWidgets.QFrame, MContainer):
+class MWindowManager(QtWidgets.QFrame, MHierarchicalElement):
 
     window_hierarchy_updated_sig = pyqtSignal()
 
@@ -23,14 +26,17 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
         super().__init__()
         self.setObjectName("win_manage")
         self.setStyleSheet(self.styleSheet() + "QFrame#win_manage{background: rgb(50,50, 50)}")
-        self.process_move = False
+        self.child_mouse_pressed_on = None
         self.child_containers = []
         self.move_offset = QPoint(0,0)
-        self.window = None
         self.setMouseTracking(True)
         self.resize_dimension = self.resize_regions["none"]
         self.window_hierarchy = {}
         self.uid = 0
+#        self.container = MContainer(None)
+
+#    def get_container(self):
+#        return self.container
 
     def get_uid(self):
         return self.uid
@@ -40,15 +46,17 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
 
 
     def add_window(self, widget, title, uid = None):
+
+        #cont = MContainer(widget)
         win = MWindow(widget, title)
         win.setParent(self)
-        win.set_parent_container(self)
+        win.set_parent_he(self)
         win.setMouseTracking(True)
         win.show()
         win.move(0, 0)
 
         if type(widget) is MSplitter:
-            widget.set_parent_container(win)
+            widget.set_parent_he(win)
 
         if self._validate_uid(uid):
             win.set_uid(uid)
@@ -112,7 +120,9 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
             parent.add_content(win, location)
 
         def _place_splitter(parent, location):
-            split = MSplitter(parent.get_parent_container())
+            split = MSplitter(parent.get_parent_he())
+            #cont = MContainer(split)
+           # win = MWindow(cont, str(split))
             parent.add_content(split, location)
             self._reconstruct_window(split, value["splitter"], item_dict)
             split.set_sizes(*value["splitter"]["sizes"])
@@ -155,10 +165,11 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
                     # Create a blank splitter and add it to the parent
                     split = MSplitter(None)
                     win = parent.add_window(split, key, value["uid"])
-                    split.set_parent_container(win)
+                    win.set_parent_he(self)
 
+                    # Dive deeper into the rabbit hole and construct whatever windows/splitters/tabs
+                    # belong in the window that we just created
                     self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
-                    #self._reconstruct_window(split, ser_data[key]["splitter"], item_dict)
                     split.set_sizes(*value["splitter"]["sizes"])
 
                     win.setGeometry(value['position'][0], value['position'][1], value['size'][0], value['size'][1])
@@ -264,7 +275,7 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
             dict_["splitter"]["orientation"] = splitter.get_orientation()
             dict_["splitter"]["sizes"] = splitter.get_sizes()
         else:
-            children = parent.get_child_container()
+            children = parent.get_child_he()
             if len(children) == 0:
                 dict_[str(parent)] = {}
                 dict_[str(parent)]["position"] = (parent.x(), parent.y())
@@ -282,57 +293,66 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
             #    self._add_children_to_dict(dict_[str(child)]["splitter"], child)
 
 
-    def decouple(self, win, width = None, height = None):
-        orig_position = win.mapToGlobal(win.pos())
+    def decouple(self, content, width = None, height = None):
+        """Content: Content to be put into a window"""
+        if type(content) == MWindow:
+            old_parent = content.get_parent_he()
+            content.set_parent_he(self)
+            content.setParent(self)
+            content.show()
+            #self.add_window(content, str(content))
+
+            other_children = old_parent.get_child_he()
+            if len(other_children) == 1:
+                other_children[0].set_parent_he(self)
+                other_children[0].setParent(self)
+
+                old_parent.deleteLater()
+
+        if type(content) == MTab:
+            embedded_content = content.get_content()
+            self.add_window(embedded_content, str(content))
 
 
-        old_parent = win.get_parent_container()
+    def join_windows_in_tab(self, droppee, dropped):
+        cont = dropped.get_content()
+        title = str(dropped)
+
+        if type(droppee.get_content()) is MTabOrganizer:
+            tab = MTab(dropped.get_content())
+            droppee.get_content().add_tab(tab, title)
+
+            self.remove_window(dropped)
 
 
 
-        win.setParent(self)
-        win.set_parent_container(self)
-
-        # Take the global position from the window and map it to coordinates of the main window
-        # Then move the window to that position
-        orig_position_mapped_to_main_window = self.mapFromGlobal(orig_position)
-
-        if(width is not None and height is not None):
-            win.setGeometry(orig_position_mapped_to_main_window.x(),
-                            orig_position_mapped_to_main_window.y(),
-                            width,
-                            height)
         else:
-            win.move(orig_position_mapped_to_main_window)
+            # Create a new tab organizer and add the contents of both windows to it
+            title1 = str(dropped)
+            title2 = str(droppee)
 
-        win.updateGeometry()
-        children_windows = [child for child in old_parent.get_child_container() if type(child) is MWindow]
-        children_elements = [child for child in old_parent.get_child_container() if type(child) is MWindow]
+            tab_organizer = MTabOrganizer()
 
-        if(len(children_windows) == 1):
-            orig_width = children_windows[0].width()
-            orig_height = children_windows[0].height()
-            self.decouple(children_windows[0], orig_width, orig_height)
-            #print("Deleting", old_parent.get_title())
-            #self.remove_window(old_parent)
-        else:
-            pass
-            other_content = old_parent.get_content()
-            if(len(children_windows) >= 2):
-                new_title = ''
-                for window in children_windows:
-                    new_title = new_title + str(window) + ","
-                new_window = self.add_window(other_content, new_title)
-                for window in children_elements:
-                    window.set_parent_container(new_window)
-            #print("deleting", old_parent)
-            old_parent.setStyleSheet("background-color:purple")
-            self.remove_window(old_parent)
+            tab1 = MTab(dropped.get_content())
+            tab2 = MTab(droppee.get_content())
 
-        #old_parent.setParent(None)
+            # Now that we have moved the content to tabs, we can delete the old windows
+            self.remove_window(dropped)
+            self.remove_window(droppee)
 
-        win.show()
-        return win
+            tab_organizer.add_tab(tab1, title1)
+            tab_organizer.add_tab(tab2, title2)
+
+
+            #win = MWindow(tab, "new tabber")
+            self.add_window(tab_organizer, "tabber")
+            #droppee.parentWidget().layout().replaceWidget(droppee, win)
+            #droppee.set_content(tab)
+
+
+
+
+
 
     def join_windows_in_splitter(self, win1, win2, location):
         # If the destination window already contains a splitter
@@ -341,7 +361,7 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
             # Take out the existing splitter and its contents
             existing_splitter = win1.get_content()
             print("Content", existing_splitter)
-            existing_windows = [child for child in win1.get_child_container()]
+            existing_windows = [child for child in win1.get_child_he()]
             print("Existing windows", [str(win) for win in existing_windows])
             new_splitter = MSplitter(None)
 
@@ -356,8 +376,8 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
 
             # Now we need to re-parent all existing windows as well as the one that was dragged in
             for window in existing_windows:
-                window.set_parent_container(new_window)
-            win2.set_parent_container(new_window)
+                window.set_parent_he(new_window)
+            win2.set_parent_he(new_window)
 
             # Delete win2 and win1. Their contents has been removed and combined in a new window
             print("Deleting", win1.get_title())
@@ -368,7 +388,7 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
             # Take out the existing splitter and its contents
             existing_splitter = win2.get_content()
             # Create a copy because we need to modify the list
-            existing_windows = [child for child in win2.get_child_container()]
+            existing_windows = [child for child in win2.get_child_he()]
 
             new_splitter = MSplitter(None)
 
@@ -384,8 +404,8 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
 
             # Now we need to re-parent all existing windows as well as the one that was dragged in
             for window in existing_windows:
-                window.set_parent_container(new_window)
-            win1.set_parent_container(new_window)
+                window.set_parent_he(new_window)
+            win1.set_parent_he(new_window)
 
             # Delete win2 and win1. Their contents has been removed and combined in a new window
             print("Deleting", win2.get_title())
@@ -400,8 +420,8 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
             new_splitter.add_content(win1, location)
 
 
-            win1.set_parent_container(new_win)
-            win2.set_parent_container(new_win)
+            win1.set_parent_he(new_win)
+            win2.set_parent_he(new_win)
 
 
 
@@ -561,11 +581,13 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
                 return win
 
     def mousePressEvent(self, event):
-        #print("You clicked!")
+        print("You clicked!")
         child = self.childAt(self.mapFromGlobal(event.globalPos()))
+        self.mouse_pressed_at_pos = event.globalPos()
+
         if child:
 
-            #child.raise_()
+            child.raise_()
             win = self.high_z_child_window_at(event.globalPos())
             if win:
                 win.raise_()
@@ -578,25 +600,39 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
             if resize_region:
                 self.resize_dimension = resize_region
                 if type(child) is MHeaderBar:
-                    self.window = child.getWindow()
+                    self.child_mouse_pressed_on = child.getWindow()
                 elif type(child) is MWindow:
-                    self.window = child
+                    self.child_mouse_pressed_on = child
 
             # Test to see if we are clicking on the header bar (window drag)
             elif type(child) is MHeaderBar:
                 print("You clicked on my header")
-                self.process_move = True
-                self.window = child.getWindow()
+
+                self.child_mouse_pressed_on = child
+                if type(self.child_mouse_pressed_on) == MHeaderBar:
+                    target = self.child_mouse_pressed_on.getWindow()
+
+                #self.child_mouse_pressed_on = child.getWindow()
 
                 # Decouple the window we are moving if it is embedded in another layout
-                if self.window.parent() is not self:
+                if target.parent() is not self:
                     global_pos = event.globalPos()
-                    offset_pos = self.window.mapFromGlobal(global_pos)
-                    self.decouple(self.window)
+                    offset_pos = self.child_mouse_pressed_on.mapFromGlobal(global_pos)
+                    self.decouple(target)
                     # Move the window in the domain fo the main window
-                    self.window.move(self.mapFromGlobal(global_pos))
-                self.move_offset = event.globalPos() - self.mapToGlobal(self.window.pos())
+                    self.child_mouse_pressed_on.move(self.mapFromGlobal(global_pos))
+                self.move_offset = event.globalPos() - self.mapToGlobal(self.child_mouse_pressed_on.pos())
                 event.accept()
+
+            elif type(child) is QTabBar:
+                self.child_mouse_pressed_on = child
+
+                tab_organizer = self.child_mouse_pressed_on.parentWidget()
+                tab_index = self.child_mouse_pressed_on.tabAt(self.child_mouse_pressed_on.mapFromGlobal(event.globalPos()))
+                tab_widget = tab_organizer.get_tab(tab_index)
+                tab_content = tab_widget.get_content()
+
+            print("Type of child:", type(child))
             # Test to see if we are just clicking on a window
 
         else:
@@ -604,46 +640,84 @@ class MWindowManager(QtWidgets.QFrame, MContainer):
             return
 
     def mouseReleaseEvent(self, event):
-        # print("You released!")
-        self.process_move = False
+        print("You released!")
+
         self.resize_dimension = self.resize_regions["none"]
        # self.resize_dimension = self.resize_regions["none"]
         # Figure out if we are above another window
+        target = None
+        if type(self.child_mouse_pressed_on) == MHeaderBar:
+            target = self.child_mouse_pressed_on.getWindow()
+
         for child in self.children():
-            if self.window is not child:
+            if target and target is not child:
                 if child.geometry().contains(self.mapFromGlobal(event.globalPos())):
                     drop_region = child.over_drop_regions(event.globalPos())
                     if drop_region is child.get_drop_region("top"):
-                        self.join_windows_in_splitter(self.window, child, "top")
-                    if drop_region is child.get_drop_region("left"):
-                        self.join_windows_in_splitter(self.window, child, "left")
-                    if drop_region is child.get_drop_region("right"):
-                        self.join_windows_in_splitter(self.window, child, "right")
-                    if drop_region is child.get_drop_region("bottom"):
-                        self.join_windows_in_splitter(self.window, child, "bottom")
+                        self.join_windows_in_splitter(target, child, "top")
+                    elif drop_region is child.get_drop_region("left"):
+                        self.join_windows_in_splitter(target, child, "left")
+                    elif drop_region is child.get_drop_region("right"):
+                        self.join_windows_in_splitter(target, child, "right")
+                    elif drop_region is child.get_drop_region("bottom"):
+                        self.join_windows_in_splitter(target, child, "bottom")
+                    elif drop_region is child.get_drop_region("onto"):
+                        self.join_windows_in_tab(child, target)
                     print("You dropped a child on another child!")
                     break
             self._defocus_all_drop_regions()
         self.construct_window_hierarcy()
-
+        self.child_mouse_pressed_on = None
         event.accept()
 
     def mouseMoveEvent(self, event):
         #print("Mouse is moving!")
         if self.resize_dimension:
-            self.move_window_dimension_to(self.window, self.resize_dimension, event.globalPos())
+            self.move_window_dimension_to(self.child_mouse_pressed_on, self.resize_dimension, event.globalPos())
 
-        elif self.process_move:
+        elif type(self.child_mouse_pressed_on) == MHeaderBar:
+            if type(self.child_mouse_pressed_on) == MHeaderBar:
+                target = self.child_mouse_pressed_on.getWindow()
+
             #print("Mouse is moving!")
-            self.window.move(event.pos() - self.move_offset)
+            target.move(event.pos() - self.move_offset)
 
             for child in self.children():
-                if self.window is not child and type(child) is MWindow:
+                if target is not child and type(child) is MWindow:
                     if child.geometry().contains(event.pos()):
                         child.show_drop_regions()
                         child.focus_drop_region(event.globalPos())
                     else:
                         child.hide_drop_regions()
+        elif type(self.child_mouse_pressed_on) == QTabBar:
+            orig_pos = self.mouse_pressed_at_pos
+            curr_pos = event.globalPos()
+            d_x = (orig_pos - curr_pos).x()
+            d_y = (orig_pos - curr_pos).y()
+            distance_moved = (d_x ** 2 + d_y ** 2) ** 0.5
+            print("Distance moved:", distance_moved)
+
+            # Decouple the window from the tab widget if the mouse is being deliberately moved.
+            # This is to prevent a single click from triggering a window decouple
+            if distance_moved > 20:
+
+                tab_organizer = self.child_mouse_pressed_on.parentWidget()
+                tab_index = self.child_mouse_pressed_on.tabAt(self.child_mouse_pressed_on.mapFromGlobal(self.mouse_pressed_at_pos))
+                tab_widget = tab_organizer.get_tab(tab_index)
+                tab_content = tab_widget.get_content()
+                print("Tab content:", tab_content)
+
+                self.decouple(tab_widget,
+                              tab_content.width(),
+                              tab_content.height())
+
+                tab_organizer.remove_tab(tab_index)
+
+                self.child_mouse_pressed_on = None
+
+
+
+
         else:
             self.update_cursor_shape(event.globalPos())
     #

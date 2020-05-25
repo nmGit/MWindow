@@ -1,8 +1,10 @@
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QSizePolicy, QSplitter
 from PyQt5.QtCore import Qt
-from Elements.MContainer import MContainer
+from Elements.MHierarchicalElement import MHierarchicalElement
+#from Elements.MContainer import MContainer
+from Elements.MWindow import MWindow
 
-class MSplitter(QFrame, MContainer):
+class MSplitter(QFrame, MHierarchicalElement):
 
     VERTICAL = 'vertical'
     HORIZONTAL = 'horizontal'
@@ -16,7 +18,7 @@ class MSplitter(QFrame, MContainer):
         self.setLayout(self.main_layout)
         self.parent_container = None
 
-        self.set_parent_container(parent_window)
+        #self.set_parent_he(parent_window)
 
         self.main_splitter = QSplitter()
         self.main_splitter.setObjectName("main_splitter")
@@ -26,6 +28,7 @@ class MSplitter(QFrame, MContainer):
         #self.header_frame = MHeaderBar(self)
 
         #self.main_layout.addWidget(self.header_frame)
+        self.content = self.main_splitter
         self.main_layout.addWidget(self.main_splitter)
         self.show()
 
@@ -38,7 +41,7 @@ class MSplitter(QFrame, MContainer):
                                                "QSplitter::handle:pressed#main_splitter"
                                                "{"
                                                "    border: 2px solid rgb(100,100,100);"
-                                               "    background-color:rgb(50,50,50)"
+                                               "    background-color:rgb(200,100,20)"
                                                "}"
                            )
 
@@ -52,31 +55,35 @@ class MSplitter(QFrame, MContainer):
     def get_sizes(self):
         return self.main_splitter.sizes()
 
-    def add_content(self, content, location = None):
+    def add_content(self, container, location = None):
+
+        # if not (type(container) is MContainer):
+        #     raise TypeError("Expected type %s, got %s" % (str(MWindow), type(container)))
+
         if location is None:
-            self.main_splitter.addWidget(content)
+            self.main_splitter.addWidget(container)
 
         elif location is "top":
             self.main_splitter.setOrientation(Qt.Vertical)
-            self.main_splitter.insertWidget(0, content)
+            self.main_splitter.insertWidget(0, container)
             self.orientation = self.VERTICAL
 
         elif location is "left":
             self.main_splitter.setOrientation(Qt.Horizontal)
-            self.main_splitter.insertWidget(0, content)
+            self.main_splitter.insertWidget(0, container)
             self.orientation = self.HORIZONTAL
 
         elif location is "right":
             self.main_splitter.setOrientation(Qt.Horizontal)
-            self.main_splitter.insertWidget(1, content)
+            self.main_splitter.insertWidget(1, container)
             self.orientation = self.HORIZONTAL
 
         elif location is "bottom":
             self.main_splitter.setOrientation(Qt.Vertical)
-            self.main_splitter.insertWidget(1, content)
+            self.main_splitter.insertWidget(1, container)
             self.orientation = self.VERTICAL
 
-        content.set_parent_container(self.get_parent_container())
+        container.set_parent_he(self.get_parent_he())
         self.updateGeometry()
 
     def get_orientation(self):
